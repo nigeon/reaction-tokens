@@ -78,8 +78,7 @@ contract ReactionToken is Context, ERC20 {
 
         // Approve token to be upgraded
         if (_stakingToken.allowance(address(this), _stakingSuperToken) < amount) {
-            uint256 zero = 0;
-            bool success = _stakingToken.approve(_stakingSuperToken, zero - 1); // max allowance
+            bool success = _stakingToken.approve(_stakingSuperToken, amount); // max allowance
             require(success, "ReactionToken: failed to approve allowance to SuperToken");
         }
 
