@@ -1,9 +1,18 @@
 import "@nomiclabs/hardhat-ethers";
 import { expect } from "chai";
-import { ethers } from "hardhat";
+import { ethers, network } from "hardhat";
 import { BigNumber, Contract } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { Address } from "hardhat-deploy/dist/types";
+
+const timeTravel = async (time: number) => {
+    const startBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
+    await network.provider.send("evm_increaseTime", [time]);
+    await network.provider.send("evm_mine");
+    const endBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
+
+    console.log(`Time Travelled ${time} (sec) => FROM ${startBlock.timestamp} TO ${endBlock.timestamp}`);
+};  
 
 describe("Reaction Tokens", function () {
     let owner: SignerWithAddress,
@@ -105,12 +114,25 @@ describe("Reaction Tokens", function () {
         await expect(erc20Contract.approve(reactionTokenContract.address, stakingAmount))
             .to.emit(erc20Contract, "Approval");
 
-        await expect(reactionTokenContract.stakeAndMint(stakingAmount, erc721Contract.address))
-            .to.emit(reactionTokenContract, "Staked")
-            .withArgs(owner.address, stakingAmount, stakingAmount);
+        // Staking
+        tx = await reactionTokenContract.stakeAndMint(stakingAmount, erc721Contract.address);
+        receipt = await tx.wait();
+        receipt = receipt.events?.filter((x: any) => {return x.event == "Staked"})[0];
+        expect(receipt.args.author).to.be.equal(owner.address);
+        expect(receipt.args.amount).to.be.equal(stakingAmount);
+        expect(receipt.args.stakingSuperTokenAdress).to.be.properAddress;
+        expect(receipt.args.totalStaked).to.be.equal(stakingAmount);
 
         expect(await reactionTokenContract.balanceOf(erc721Contract.address)).to.equal(stakingAmount);
         
+        const superTokenContract = await ethers.getContractAt("ISuperToken", receipt.args.stakingSuperTokenAdress);
+
+        await timeTravel(3600); // ONE HOUR LATER ... 🐙
+        const secondsInAMonth = 2592000;
+        const expectedInOneHour = stakingAmount.div(secondsInAMonth).mul(3600);
+        let realtimeBalance = await superTokenContract.realtimeBalanceOfNow(owner.address);
+        expect(+realtimeBalance.availableBalance.toString()).to.be.closeTo(+expectedInOneHour.toString(), +ethers.utils.parseEther("1").toString());
+
         // Staking with no approval
         await expect(reactionTokenContract.stakeAndMint(stakingAmount, erc721Contract.address)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
 
@@ -118,11 +140,19 @@ describe("Reaction Tokens", function () {
         await expect(erc20Contract.approve(reactionTokenContract.address, stakingAmount))
             .to.emit(erc20Contract, "Approval");
 
-        await expect(reactionTokenContract.stakeAndMint(stakingAmount, erc721Contract.address))
-            .to.emit(reactionTokenContract, "Staked")
-            .withArgs(owner.address, stakingAmount, stakingAmount.mul(2));
+        tx = await reactionTokenContract.stakeAndMint(stakingAmount, erc721Contract.address);
+        receipt = await tx.wait();
+        receipt = receipt.events?.filter((x: any) => {return x.event == "Staked"})[0];
+        expect(receipt.args.author).to.be.equal(owner.address);
+        expect(receipt.args.amount).to.be.equal(stakingAmount);
+        expect(receipt.args.stakingSuperTokenAdress).to.be.properAddress;
+        expect(receipt.args.totalStaked).to.be.equal(stakingAmount.mul(2));
 
         expect(await reactionTokenContract.balanceOf(erc721Contract.address)).to.equal(stakingAmount.mul(2));
+
+        await timeTravel(3600); // ONE HOUR LATER ... 🐙
+        realtimeBalance = await superTokenContract.realtimeBalanceOfNow(owner.address);        
+        expect(+realtimeBalance.availableBalance.toString()).to.be.closeTo(+expectedInOneHour.mul(2).toString(), +ethers.utils.parseEther("1").toString());
     });
 
 });
