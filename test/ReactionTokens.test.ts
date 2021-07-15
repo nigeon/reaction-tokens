@@ -1,7 +1,7 @@
 import "@nomiclabs/hardhat-ethers";
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { Contract } from "ethers";
+import { BigNumber, Contract } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { Address } from "hardhat-deploy/dist/types";
 
@@ -28,7 +28,7 @@ describe("Reaction Tokens", function () {
         // Deploy a dummy ERC20 token to be used later
         const dummyErc20Name = "DummyErc20";
         const contractFactory = await ethers.getContractFactory(dummyErc20Name);
-        erc20Contract = await contractFactory.deploy(100000);
+        erc20Contract = await contractFactory.deploy(ethers.utils.parseEther("10000"));
 
         expect(erc20Contract.address).to.be.properAddress;
         expect(await erc20Contract.name()).to.be.equal(dummyErc20Name);
@@ -88,10 +88,9 @@ describe("Reaction Tokens", function () {
 
         // Deploy new Reaction Token
         const stakingToken: Address = erc20Contract.address;
-        const stakingAmount: number = 1000;
+        const stakingAmount: BigNumber = ethers.utils.parseEther("1000");
         const reactionTokenName: string = 'Like';
         const reactionTokenSymbol: string = 'LIKE';
-        const nftAddress: Address = "";
         
         let tx = await reactionFactoryContract.deployReaction(stakingToken, reactionTokenName, reactionTokenSymbol);
         let receipt = await tx.wait();
@@ -110,19 +109,20 @@ describe("Reaction Tokens", function () {
             .to.emit(reactionTokenContract, "Staked")
             .withArgs(owner.address, stakingAmount, stakingAmount);
 
-        // expect(await reactionTokenContract.balanceOf(erc721Contract.address)).to.equal(stakingAmount);
-
-        // await expect(reactionTokenContract.stakeAndMint(stakingAmount)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
+        expect(await reactionTokenContract.balanceOf(erc721Contract.address)).to.equal(stakingAmount);
+        
+        // Staking with no approval
+        await expect(reactionTokenContract.stakeAndMint(stakingAmount, erc721Contract.address)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
 
         // Staking a bit more
-        // await expect(erc20Contract.approve(reactionTokenContract.address, stakingAmount))
-        //     .to.emit(erc20Contract, "Approval");
+        await expect(erc20Contract.approve(reactionTokenContract.address, stakingAmount))
+            .to.emit(erc20Contract, "Approval");
 
-        // await expect(reactionTokenContract.stakeAndMint(stakingAmount))
-        //     .to.emit(reactionTokenContract, "Staked")
-        //     .withArgs(owner.address, stakingAmount, stakingAmount*2);
+        await expect(reactionTokenContract.stakeAndMint(stakingAmount, erc721Contract.address))
+            .to.emit(reactionTokenContract, "Staked")
+            .withArgs(owner.address, stakingAmount, stakingAmount.mul(2));
 
-        // expect(await reactionTokenContract.balanceOf(owner.address)).to.equal(stakingAmount*2);
+        expect(await reactionTokenContract.balanceOf(erc721Contract.address)).to.equal(stakingAmount.mul(2));
     });
 
 });

@@ -30,8 +30,6 @@ contract ReactionToken is Context, ERC20 {
 
     ISuperTokenFactory private _superTokenFactory;
 
-    int96 private _flowRate = 385802469135802; // 1000 per month
-
     mapping(address => uint256) private _staked;
 
     constructor(
@@ -63,7 +61,6 @@ contract ReactionToken is Context, ERC20 {
         require(address(nftAddress) != address(0));
 
         // Stake everything here
-        // I think we can remove this as we'll wrap it as SuperToken (and that will transfer())
         IERC20(_stakingToken).transferFrom(_msgSender(), address(this), amount);
         _staked[_msgSender()] = _staked[_msgSender()] + amount;
 
@@ -85,6 +82,10 @@ contract ReactionToken is Context, ERC20 {
         // Give token Superpowers
         ISuperToken(_stakingSuperToken).upgrade(amount);
 
+        // Calculate the flow rate
+        uint256 secondsInAMonth = 2592000;
+        uint256 flowRate = amount/secondsInAMonth; // return the whole stake in one month
+
         // Create CFA
         _host.callAgreement(
             _cfa,
@@ -92,10 +93,10 @@ contract ReactionToken is Context, ERC20 {
                 _cfa.createFlow.selector,
                 _stakingSuperToken,
                 _msgSender(),
-                _flowRate,
+                flowRate,
                 new bytes(0) // placeholder
             ),
-            "0x"
+            new bytes(0)
         );
 
         emit Staked(_msgSender(), amount, _staked[_msgSender()]);
