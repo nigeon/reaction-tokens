@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import "@nomiclabs/hardhat-waffle";
 import "hardhat-gas-reporter";
 import "hardhat-contract-sizer";
@@ -21,31 +22,31 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       forking: { 
-        url: "https://eth-goerli.alchemyapi.io/v2/8RAnGQRzrDvOYBzM3K_vNdnc52xWa6r6"
+        url: `https://eth-goerli.alchemyapi.io/v2/${process.env.ALCHEMY_APIKEY}`
       }
     },
     mainnet: {
-      url: "https://mainnet.infura.io/v3/ac4be4d111564e39bdc4f0cc0e10c7a1",
+      url: `https://mainnet.infura.io/v3/${process.env.INFURA_PROJECTID}`,
       chainId: 1,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : "remote",
     },
     ropsten: {
-      url: "https://ropsten.infura.io/v3/ac4be4d111564e39bdc4f0cc0e10c7a1",
+      url: `https://ropsten.infura.io/v3/${process.env.INFURA_PROJECTID}`,
       chainId: 3,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : "remote",
     },
     goerli: {
-      url: "https://goerli.infura.io/v3/ac4be4d111564e39bdc4f0cc0e10c7a1",
+      url: `https://goerli.infura.io/v3/${process.env.INFURA_PROJECTID}`,
       chainId: 5,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : "remote",
     },
     mumbai: {
-      url: "https://polygon-mumbai.infura.io/v3/ac4be4d111564e39bdc4f0cc0e10c7a1",
+      url: `https://polygon-mumbai.infura.io/v3/${process.env.INFURA_PROJECTID}`,
       chainId: 80001,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : "remote",
     },
     matic: {
-      url: "https://polygon-mainnet.infura.io/v3/ac4be4d111564e39bdc4f0cc0e10c7a1",
+      url: `https://polygon-mainnet.infura.io/v3/${process.env.INFURA_PROJECTID}`,
       chainId: 137,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : "remote",
     },
@@ -55,7 +56,7 @@ const config: HardhatUserConfig = {
     tests: "./test"
   },
   gasReporter: {
-    coinmarketcap: 'a3b86dcc-de63-4a66-b532-56bf7009292c',
+    coinmarketcap: process.env.COINMARKETCAP_APIKEY,
     currency: 'USD',
     gasPrice: 18
   }

@@ -11,7 +11,7 @@ const timeTravel = async (time: number) => {
     await network.provider.send("evm_mine");
     const endBlock = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
 
-    console.log(`Time Travelled ${time} (sec) => FROM ${startBlock.timestamp} TO ${endBlock.timestamp}`);
+    console.log(`\tTime Travelled ${time} (sec) => FROM ${startBlock.timestamp} TO ${endBlock.timestamp}`);
 };  
 
 describe("Reaction Tokens", function () {
@@ -24,11 +24,11 @@ describe("Reaction Tokens", function () {
     let erc721Contract: Contract;
 
     // SuperFluid config (Goerli)
-    const sfHost: Address = "0x22ff293e14F1EC3A09B137e9e06084AFd63adDF9";
-    const sfCfa: Address = "0xEd6BcbF6907D4feEEe8a8875543249bEa9D308E8";
-    const sfSuperTokenFactory: Address = "0x94f26B4c8AD12B18c12f38E878618f7664bdcCE2";
-    const sfResolver: Address = "0x3710AB3fDE2B61736B8BB0CE845D6c61F667a78E";
-    const sfVersion: string = "1";
+    const sfHost: Address = process.env.SUPERFLUID_HOST || '';
+    const sfCfa: Address = process.env.SUPERFLUID_CFA || '';
+    const sfSuperTokenFactory: Address = process.env.SUPERFLUID_SUPERTOKENFACTORY || '';
+    const sfResolver: Address = process.env.SUPERFLUID_RESOLVER || '';
+    const sfVersion: string = process.env.SUPERFLUID_VERSION || '';
 
     beforeEach(async function () {
         // Get some signers
@@ -52,7 +52,7 @@ describe("Reaction Tokens", function () {
         expect(await erc721Contract.name()).to.be.equal(dummyErc721Name);
     });
 
-    it("Should have multiple siners with balance > 0", async function () {
+    it("Should have multiple signers with balance > 0", async function () {
         expect(owner.address).to.not.equal(alice.address);
         expect(owner.address).to.not.equal(bob.address);
         expect(alice.address).to.not.equal(bob.address);
@@ -130,29 +130,13 @@ describe("Reaction Tokens", function () {
         await timeTravel(3600); // ONE HOUR LATER ... 🐙
         const secondsInAMonth = 2592000;
         const expectedInOneHour = stakingAmount.div(secondsInAMonth).mul(3600);
-        let realtimeBalance = await superTokenContract.realtimeBalanceOfNow(owner.address);
-        expect(+realtimeBalance.availableBalance.toString()).to.be.closeTo(+expectedInOneHour.toString(), +ethers.utils.parseEther("1").toString());
+        expect(+(await superTokenContract.balanceOf(owner.address)).toString()).to.be.closeTo(+expectedInOneHour.toString(), +ethers.utils.parseEther("1").toString());
+
+        await timeTravel(3600*24*30-3600); // ABOUT A MONTH LATER ... 🐙
+        expect(+(await superTokenContract.balanceOf(owner.address)).toString()).to.be.closeTo(+stakingAmount.toString(), +ethers.utils.parseEther("1").toString());
 
         // Staking with no approval
         await expect(reactionTokenContract.stakeAndMint(stakingAmount, erc721Contract.address)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
-
-        // Staking a bit more
-        await expect(erc20Contract.approve(reactionTokenContract.address, stakingAmount))
-            .to.emit(erc20Contract, "Approval");
-
-        tx = await reactionTokenContract.stakeAndMint(stakingAmount, erc721Contract.address);
-        receipt = await tx.wait();
-        receipt = receipt.events?.filter((x: any) => {return x.event == "Staked"})[0];
-        expect(receipt.args.author).to.be.equal(owner.address);
-        expect(receipt.args.amount).to.be.equal(stakingAmount);
-        expect(receipt.args.stakingSuperTokenAdress).to.be.properAddress;
-        expect(receipt.args.totalStaked).to.be.equal(stakingAmount.mul(2));
-
-        expect(await reactionTokenContract.balanceOf(erc721Contract.address)).to.equal(stakingAmount.mul(2));
-
-        await timeTravel(3600); // ONE HOUR LATER ... 🐙
-        realtimeBalance = await superTokenContract.realtimeBalanceOfNow(owner.address);        
-        expect(+realtimeBalance.availableBalance.toString()).to.be.closeTo(+expectedInOneHour.mul(2).toString(), +ethers.utils.parseEther("1").toString());
     });
 
 });
