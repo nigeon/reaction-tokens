@@ -57,7 +57,7 @@ describe("Reaction Tokens", function () {
         expect(owner.address).to.not.equal(bob.address);
         expect(alice.address).to.not.equal(bob.address);
 
-        // expect((await owner.getBalance()).toString()).to.be.equal(ethers.utils.parseEther("10000")); // Owner deployed the DummyERC20
+        // expect((await owner.getBalance()).toString()).to.be.closeTo(ethers.utils.parseEther("10000"), +(ethers.utils.parseEther("0.1").toString())); // Owner deployed the DummyERC20
         expect((await bob.getBalance()).toString()).to.be.equal(ethers.utils.parseEther("10000"));
         expect((await alice.getBalance()).toString()).to.be.equal(ethers.utils.parseEther("10000"));
     });
@@ -69,20 +69,19 @@ describe("Reaction Tokens", function () {
         expect(reactionFactoryContract.address).to.be.properAddress;
 
         // Init Factory
-        reactionFactoryContract.initialize(sfHost, sfCfa, sfSuperTokenFactory, sfResolver, sfVersion);
+        await expect(reactionFactoryContract.initialize(sfHost, sfCfa, sfSuperTokenFactory, sfResolver, sfVersion))
+            .to.emit(reactionFactoryContract, "Initialized");
 
         // Deploy new Reaction Token
-        const stakingToken: Address = erc20Contract.address;
         const reactionTokenName: string = 'Like';
         const reactionTokenSymbol: string = 'LIKE';
         
-        let tx = await reactionFactoryContract.deployReaction(stakingToken, reactionTokenName, reactionTokenSymbol);
+        let tx = await reactionFactoryContract.deployReaction(reactionTokenName, reactionTokenSymbol);
         let receipt = await tx.wait();
         receipt = receipt.events?.filter((x: any) => {return x.event == "ReactionDeployed"})[0];
         
         expect(receipt.args.creator).to.be.equal(owner.address);
         expect(receipt.args.reactionContractAddr).to.be.properAddress;
-        expect(receipt.args.stakingToken).to.be.equal(stakingToken);
         expect(receipt.args.reactionTokenName).to.be.equal(reactionTokenName);
         expect(receipt.args.reactionTokenSymbol).to.be.equal(reactionTokenSymbol);
     });
@@ -93,15 +92,14 @@ describe("Reaction Tokens", function () {
         const reactionFactoryContract: Contract = await contractFactory.deploy();
 
         // Init Factory
-        reactionFactoryContract.initialize(sfHost, sfCfa, sfSuperTokenFactory, sfResolver, sfVersion);
+        await expect(reactionFactoryContract.initialize(sfHost, sfCfa, sfSuperTokenFactory, sfResolver, sfVersion))
+            .to.emit(reactionFactoryContract, "Initialized");
 
         // Deploy new Reaction Token
-        const stakingToken: Address = erc20Contract.address;
-        const stakingAmount: BigNumber = ethers.utils.parseEther("1000");
         const reactionTokenName: string = 'Like';
         const reactionTokenSymbol: string = 'LIKE';
         
-        let tx = await reactionFactoryContract.deployReaction(stakingToken, reactionTokenName, reactionTokenSymbol);
+        let tx = await reactionFactoryContract.deployReaction(reactionTokenName, reactionTokenSymbol);
         let receipt = await tx.wait();
         receipt = receipt.events?.filter((x: any) => {return x.event == "ReactionDeployed"})[0];
 
@@ -109,19 +107,19 @@ describe("Reaction Tokens", function () {
         expect(reactionTokenContractAddr).to.be.properAddress;
 
         const reactionTokenContract = await ethers.getContractAt("ReactionToken", reactionTokenContractAddr);
-
+                
         // Approve tokens sending
+        const stakingAmount: BigNumber = ethers.utils.parseEther("1000");
         await expect(erc20Contract.approve(reactionTokenContract.address, stakingAmount))
             .to.emit(erc20Contract, "Approval");
 
         // Staking
-        tx = await reactionTokenContract.stakeAndMint(stakingAmount, erc721Contract.address);
+        tx = await reactionTokenContract.stakeAndMint(stakingAmount, erc20Contract.address, erc721Contract.address);
         receipt = await tx.wait();
         receipt = receipt.events?.filter((x: any) => {return x.event == "Staked"})[0];
         expect(receipt.args.author).to.be.equal(owner.address);
-        expect(receipt.args.amount).to.be.equal(stakingAmount);
+        expect(receipt.args.stakingTokenAddress).to.be.equal(erc20Contract.address);
         expect(receipt.args.stakingSuperTokenAddress).to.be.properAddress;
-        expect(receipt.args.totalStaked).to.be.equal(stakingAmount);
 
         expect(await reactionTokenContract.balanceOf(erc721Contract.address)).to.equal(stakingAmount);
         
@@ -136,7 +134,23 @@ describe("Reaction Tokens", function () {
         expect(+(await superTokenContract.balanceOf(owner.address)).toString()).to.be.closeTo(+stakingAmount.toString(), +ethers.utils.parseEther("1").toString());
 
         // Staking with no approval
-        await expect(reactionTokenContract.stakeAndMint(stakingAmount, erc721Contract.address)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
+        await expect(reactionTokenContract.stakeAndMint(stakingAmount, erc20Contract.address, erc721Contract.address)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
+
+        // Staking & Mint with a different erc20
+        const contractFactory2 = await ethers.getContractFactory("DummyErc20");
+        const diffErc20Contract = await contractFactory2.deploy(ethers.utils.parseEther("10000"));
+        await expect(diffErc20Contract.approve(reactionTokenContract.address, stakingAmount))
+            .to.emit(diffErc20Contract, "Approval");
+
+        // Staking
+        tx = await reactionTokenContract.stakeAndMint(stakingAmount, diffErc20Contract.address, erc721Contract.address);
+        receipt = await tx.wait();
+        receipt = receipt.events?.filter((x: any) => {return x.event == "Staked"})[0];
+        expect(receipt.args.author).to.be.equal(owner.address);
+        expect(receipt.args.stakingTokenAddress).to.be.equal(diffErc20Contract.address);
+        expect(receipt.args.stakingSuperTokenAddress).to.be.properAddress;
+
+        expect(await reactionTokenContract.balanceOf(erc721Contract.address)).to.equal(stakingAmount.mul(2));
     });
 
 });

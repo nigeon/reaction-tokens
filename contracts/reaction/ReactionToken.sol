@@ -17,77 +17,62 @@ import {
 import { ERC20WithTokenInfo } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ERC20WithTokenInfo.sol";
 
 contract ReactionToken is Context, ERC20 {
-    event Staked(address author, uint256 amount, address stakingSuperTokenAddress, uint256 totalStaked);
+    event Staked(address author, uint256 amount, address stakingTokenAddress, address stakingSuperTokenAddress);
     event Reacted(address author, address nftAddress, address reactionTokenAddress, uint256 amount, string reactionTokenName, string reactionTokenSymbol);
 
     ISuperfluid internal _host; // Superfluid host address
     IConstantFlowAgreementV1 internal _cfa; // Superfluid Constant Flow Agreement address
+    ISuperTokenFactory private _superTokenFactory; // Superfluid Supertoken Factory
     IResolver internal _resolver; // Superfluid resolver
     string internal _version; // Superfluid version
-
-    ERC20WithTokenInfo private _stakingToken;
-    address private _stakingSuperToken;
-    address private _streamerAddr;
-
-    ISuperTokenFactory private _superTokenFactory;
-
-    mapping(address => uint256) private _staked;
-
-    string _reactionTokenName;
-    string _reactionTokenSymbol;
 
     constructor(
         address host, 
         address cfa, 
-        address stakingToken,
         address superTokenFactory, 
-        string memory reactionTokenName, 
-        string memory reactionTokenSymbol,
         address resolver,
-        string memory version
+        string memory version,
+        string memory reactionTokenName, 
+        string memory reactionTokenSymbol
     ) ERC20(reactionTokenName, reactionTokenSymbol) {
-        assert(address(host) != address(0));
-        assert(address(cfa) != address(0));
-        assert(address(stakingToken) != address(0));
-        assert(address(superTokenFactory) != address(0));
-        assert(address(resolver) != address(0));
+        require(address(host) != address(0), "ReactionToken: Host Address can't be 0x");
+        require(address(cfa) != address(0), "ReactionToken: CFA Address can't be 0x");
+        require(address(superTokenFactory) != address(0), "ReactionToken: SuperTokenFactory Address can't be 0x");
+        require(address(resolver) != address(0), "ReactionToken: Resolver Address can't be 0x");
 
         _host = ISuperfluid(host);
         _cfa =  IConstantFlowAgreementV1(cfa);
+        _superTokenFactory = ISuperTokenFactory(superTokenFactory);
         _resolver = IResolver(resolver);
         _version = version;
-        
-        _stakingToken = ERC20WithTokenInfo(stakingToken);
-        _superTokenFactory = ISuperTokenFactory(superTokenFactory);
-
-        _reactionTokenName = reactionTokenName;
-        _reactionTokenSymbol = reactionTokenSymbol;
     }
 
-    function stakeAndMint(uint256 amount, address nftAddress) public {
-        require(address(nftAddress) != address(0));
+    function stakeAndMint(uint256 amount, address stakingTokenAddress, address nftAddress) public {
+        require(address(stakingTokenAddress) != address(0), "ReactionToken: Staking Token Address can't be 0x");
+        require(address(nftAddress) != address(0), "ReactionToken: NFT Address can't be 0x");
+
+        ERC20WithTokenInfo stakingToken = ERC20WithTokenInfo(stakingTokenAddress);
 
         // Stake everything here
-        IERC20(_stakingToken).transferFrom(_msgSender(), address(this), amount);
-        _staked[_msgSender()] = _staked[_msgSender()] + amount;
+        IERC20(stakingToken).transferFrom(_msgSender(), address(this), amount);
 
         // Mint the reaction token straight to the NFT
         _mint(nftAddress, amount);
 
         // Get/Create the super token
-        _stakingSuperToken = ReactionToken.isSuperToken(_stakingToken) ? address(_stakingToken) : ReactionToken.getSuperToken(_stakingToken);
-        if (_stakingSuperToken == address(0)) {
-            _stakingSuperToken = address(ReactionToken.createSuperToken(_stakingToken));
+        address stakingSuperToken = isSuperToken(stakingToken) ? address(stakingToken) : getSuperToken(stakingToken);
+        if (stakingSuperToken == address(0)) {
+            stakingSuperToken = address(createSuperToken(stakingToken));
         }
 
         // Approve token to be upgraded
-        if (_stakingToken.allowance(address(this), _stakingSuperToken) < amount) {
-            bool success = _stakingToken.approve(_stakingSuperToken, amount); // max allowance
-            require(success, "ReactionToken: failed to approve allowance to SuperToken");
+        if (stakingToken.allowance(address(this), stakingSuperToken) < amount) {
+            bool success = stakingToken.approve(stakingSuperToken, amount); // max allowance
+            require(success, "ReactionToken: Failed to approve allowance to SuperToken");
         }
 
         // Give token Superpowers
-        ISuperToken(_stakingSuperToken).upgrade(amount);
+        ISuperToken(stakingSuperToken).upgrade(amount);
 
         // Calculate the flow rate
         uint256 secondsInAMonth = 2592000;
@@ -98,7 +83,7 @@ contract ReactionToken is Context, ERC20 {
             _cfa,
             abi.encodeWithSelector(
                 _cfa.createFlow.selector,
-                _stakingSuperToken,
+                stakingSuperToken,
                 _msgSender(),
                 flowRate,
                 new bytes(0) // placeholder
@@ -106,8 +91,10 @@ contract ReactionToken is Context, ERC20 {
             new bytes(0)
         );
 
-        emit Staked(_msgSender(), amount, _stakingSuperToken, _staked[_msgSender()]);
-        emit Reacted(_msgSender(), nftAddress, address(this), amount, _reactionTokenName, _reactionTokenSymbol);
+        emit Staked(_msgSender(), amount, stakingTokenAddress, stakingSuperToken);
+
+        ERC20 reactionToken = ERC20(address(this));
+        emit Reacted(_msgSender(), nftAddress, address(this), amount, reactionToken.name(), reactionToken.symbol());
     }
 
     function isSuperToken(ERC20WithTokenInfo _token) public view returns (bool) {

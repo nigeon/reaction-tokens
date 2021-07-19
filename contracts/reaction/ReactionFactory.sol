@@ -16,13 +16,14 @@ contract ReactionFactory is Context, UUPSUpgradeable, Initializable {
 
     address owner;
 
-    event ReactionDeployed(address creator, address reactionContractAddr, address stakingToken, string reactionTokenName, string reactionTokenSymbol);
+    event Initialized(address sfHost, address sfCfa, address sfSuperTokenFactory, address sfResolver, string sfVersion);
+    event ReactionDeployed(address creator, address reactionContractAddr, string reactionTokenName, string reactionTokenSymbol);
 
     function initialize(address sfHost, address sfCfa, address sfSuperTokenFactory, address sfResolver, string memory sfVersion) public payable initializer {
-        assert(sfHost != address(0));
-        assert(sfCfa != address(0));
-        assert(sfSuperTokenFactory != address(0));
-        assert(sfResolver != address(0));
+        require(address(sfHost) != address(0), "ReactionFactory: Host Address can't be 0x");
+        require(address(sfCfa) != address(0), "ReactionFactory: CFA Address can't be 0x");
+        require(address(sfSuperTokenFactory) != address(0), "ReactionFactory: SuperTokenFactory Address can't be 0x");
+        require(address(sfResolver) != address(0), "ReactionFactory: Resolver Address can't be 0x");
 
         _sfHost = sfHost;
         _sfCfa = sfCfa;
@@ -31,25 +32,24 @@ contract ReactionFactory is Context, UUPSUpgradeable, Initializable {
         _sfVersion = sfVersion;
 
         owner = _msgSender();
+
+        emit Initialized(_sfHost, _sfCfa, _sfSuperTokenFactory, _sfResolver, _sfVersion);
     }
 
-    function deployReaction(address stakingToken, string memory reactionTokenName, string memory reactionTokenSymbol) external returns (address){
-        require(stakingToken != address(0));
-
+    function deployReaction(string memory reactionTokenName, string memory reactionTokenSymbol) external returns (address){
         ReactionToken reactionContract = new ReactionToken(
             _sfHost, 
             _sfCfa, 
-            stakingToken,
             _sfSuperTokenFactory, 
-            reactionTokenName, 
-            reactionTokenSymbol,
             _sfResolver,
-            _sfVersion
-        );   
+            _sfVersion,
+            reactionTokenName, 
+            reactionTokenSymbol
+        );
 
         address reactionContractAddr = address(reactionContract);
 
-        emit ReactionDeployed(_msgSender(), reactionContractAddr, stakingToken, reactionTokenName, reactionTokenSymbol);
+        emit ReactionDeployed(_msgSender(), reactionContractAddr, reactionTokenName, reactionTokenSymbol);
 
         return reactionContractAddr;
     }
