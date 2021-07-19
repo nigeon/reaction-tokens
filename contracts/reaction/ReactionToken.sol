@@ -17,7 +17,8 @@ import {
 import { ERC20WithTokenInfo } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ERC20WithTokenInfo.sol";
 
 contract ReactionToken is Context, ERC20 {
-    event Staked(address author, uint256 amount, address stakingSuperTokenAdress, uint256 totalStaked);
+    event Staked(address author, uint256 amount, address stakingSuperTokenAddress, uint256 totalStaked);
+    event Reacted(address author, address nftAddress, address reactionTokenAddress, uint256 amount, string reactionTokenName, string reactionTokenSymbol);
 
     ISuperfluid internal _host; // Superfluid host address
     IConstantFlowAgreementV1 internal _cfa; // Superfluid Constant Flow Agreement address
@@ -31,6 +32,9 @@ contract ReactionToken is Context, ERC20 {
     ISuperTokenFactory private _superTokenFactory;
 
     mapping(address => uint256) private _staked;
+
+    string _reactionTokenName;
+    string _reactionTokenSymbol;
 
     constructor(
         address host, 
@@ -55,6 +59,9 @@ contract ReactionToken is Context, ERC20 {
         
         _stakingToken = ERC20WithTokenInfo(stakingToken);
         _superTokenFactory = ISuperTokenFactory(superTokenFactory);
+
+        _reactionTokenName = reactionTokenName;
+        _reactionTokenSymbol = reactionTokenSymbol;
     }
 
     function stakeAndMint(uint256 amount, address nftAddress) public {
@@ -100,6 +107,7 @@ contract ReactionToken is Context, ERC20 {
         );
 
         emit Staked(_msgSender(), amount, _stakingSuperToken, _staked[_msgSender()]);
+        emit Reacted(_msgSender(), nftAddress, address(this), amount, _reactionTokenName, _reactionTokenSymbol);
     }
 
     function isSuperToken(ERC20WithTokenInfo _token) public view returns (bool) {

@@ -71,7 +71,7 @@ describe("Reaction Tokens", function () {
         // Init Factory
         reactionFactoryContract.initialize(sfHost, sfCfa, sfSuperTokenFactory, sfResolver, sfVersion);
 
-        // // Deploy new Reaction Token
+        // Deploy new Reaction Token
         const stakingToken: Address = erc20Contract.address;
         const reactionTokenName: string = 'Like';
         const reactionTokenSymbol: string = 'LIKE';
@@ -120,12 +120,12 @@ describe("Reaction Tokens", function () {
         receipt = receipt.events?.filter((x: any) => {return x.event == "Staked"})[0];
         expect(receipt.args.author).to.be.equal(owner.address);
         expect(receipt.args.amount).to.be.equal(stakingAmount);
-        expect(receipt.args.stakingSuperTokenAdress).to.be.properAddress;
+        expect(receipt.args.stakingSuperTokenAddress).to.be.properAddress;
         expect(receipt.args.totalStaked).to.be.equal(stakingAmount);
 
         expect(await reactionTokenContract.balanceOf(erc721Contract.address)).to.equal(stakingAmount);
         
-        const superTokenContract = await ethers.getContractAt("ISuperToken", receipt.args.stakingSuperTokenAdress);
+        const superTokenContract = await ethers.getContractAt("ISuperToken", receipt.args.stakingSuperTokenAddress);
 
         await timeTravel(3600); // ONE HOUR LATER ... 🐙
         const secondsInAMonth = 2592000;
