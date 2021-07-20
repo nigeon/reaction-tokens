@@ -3,6 +3,7 @@ import "@nomiclabs/hardhat-waffle";
 import "hardhat-gas-reporter";
 import "hardhat-contract-sizer";
 import "solidity-coverage";
+import '@openzeppelin/hardhat-upgrades';
 import { HardhatUserConfig } from "hardhat/config";
 
 const config: HardhatUserConfig = {

@@ -14,3 +14,4 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .env
+unknown-31337.json
