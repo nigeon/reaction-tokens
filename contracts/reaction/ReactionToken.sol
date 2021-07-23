@@ -22,9 +22,11 @@ contract ReactionToken is Context, ERC20 {
 
     ISuperfluid internal _host; // Superfluid host address
     IConstantFlowAgreementV1 internal _cfa; // Superfluid Constant Flow Agreement address
-    ISuperTokenFactory private _superTokenFactory; // Superfluid Supertoken Factory
+    ISuperTokenFactory internal _superTokenFactory; // Superfluid Supertoken Factory
     IResolver internal _resolver; // Superfluid resolver
     string internal _version; // Superfluid version
+
+    string internal _tokenMetadataURI; // Metadata url
 
     constructor(
         address host, 
@@ -33,7 +35,8 @@ contract ReactionToken is Context, ERC20 {
         address resolver,
         string memory version,
         string memory reactionTokenName, 
-        string memory reactionTokenSymbol
+        string memory reactionTokenSymbol,
+        string memory tokenMetadataURI
     ) ERC20(reactionTokenName, reactionTokenSymbol) {
         require(address(host) != address(0), "ReactionToken: Host Address can't be 0x");
         require(address(cfa) != address(0), "ReactionToken: CFA Address can't be 0x");
@@ -45,6 +48,8 @@ contract ReactionToken is Context, ERC20 {
         _superTokenFactory = ISuperTokenFactory(superTokenFactory);
         _resolver = IResolver(resolver);
         _version = version;
+
+        _tokenMetadataURI = tokenMetadataURI;
     }
 
     function stakeAndMint(uint256 amount, address stakingTokenAddress, address nftAddress) public {
@@ -112,5 +117,9 @@ contract ReactionToken is Context, ERC20 {
         string memory name = string(abi.encodePacked('Super ', _token.name()));
         string memory symbol = string(abi.encodePacked(_token.symbol(), 'x'));
         superToken = factory.createERC20Wrapper(_token, ISuperTokenFactory.Upgradability.FULL_UPGRADABE, name, symbol);
+    }
+
+    function getTokenMetadataURI() public view returns (string memory) {
+        return _tokenMetadataURI;
     }
 }

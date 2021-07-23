@@ -17,7 +17,7 @@ contract ReactionFactory is Context, UUPSUpgradeable, Initializable {
     address owner;
 
     event Initialized(address sfHost, address sfCfa, address sfSuperTokenFactory, address sfResolver, string sfVersion);
-    event ReactionDeployed(address creator, address reactionContractAddr, string reactionTokenName, string reactionTokenSymbol);
+    event ReactionDeployed(address creator, address reactionContractAddr, string reactionTokenName, string reactionTokenSymbol, string tokenMetadataURI);
 
     function initialize(address sfHost, address sfCfa, address sfSuperTokenFactory, address sfResolver, string memory sfVersion) public payable initializer {
         require(address(sfHost) != address(0), "ReactionFactory: Host Address can't be 0x");
@@ -36,7 +36,7 @@ contract ReactionFactory is Context, UUPSUpgradeable, Initializable {
         emit Initialized(_sfHost, _sfCfa, _sfSuperTokenFactory, _sfResolver, _sfVersion);
     }
 
-    function deployReaction(string memory reactionTokenName, string memory reactionTokenSymbol) external returns (address){
+    function deployReaction(string memory reactionTokenName, string memory reactionTokenSymbol, string memory tokenMetadataURI) external returns (address){
         ReactionToken reactionContract = new ReactionToken(
             _sfHost, 
             _sfCfa, 
@@ -44,12 +44,13 @@ contract ReactionFactory is Context, UUPSUpgradeable, Initializable {
             _sfResolver,
             _sfVersion,
             reactionTokenName, 
-            reactionTokenSymbol
+            reactionTokenSymbol,
+            tokenMetadataURI
         );
 
         address reactionContractAddr = address(reactionContract);
 
-        emit ReactionDeployed(_msgSender(), reactionContractAddr, reactionTokenName, reactionTokenSymbol);
+        emit ReactionDeployed(_msgSender(), reactionContractAddr, reactionTokenName, reactionTokenSymbol, tokenMetadataURI);
 
         return reactionContractAddr;
     }

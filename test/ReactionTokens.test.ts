@@ -29,6 +29,7 @@ describe("Reaction Tokens", function () {
     const sfSuperTokenFactory: Address = process.env.SUPERFLUID_SUPERTOKENFACTORY || '';
     const sfResolver: Address = process.env.SUPERFLUID_RESOLVER || '';
     const sfVersion: string = process.env.SUPERFLUID_VERSION || '';
+    const tokenMetadataURI: string = "https://gateway.pinata.cloud/ipfs/QmbVsqnwUrDJBBdbr1wjC4FZNKdN5i2jQoBJyGoea5bYy9";
 
     beforeEach(async function () {
         // Get some signers
@@ -76,7 +77,7 @@ describe("Reaction Tokens", function () {
         const reactionTokenName: string = 'Like';
         const reactionTokenSymbol: string = 'LIKE';
         
-        let tx = await reactionFactoryContract.deployReaction(reactionTokenName, reactionTokenSymbol);
+        let tx = await reactionFactoryContract.deployReaction(reactionTokenName, reactionTokenSymbol, tokenMetadataURI);
         let receipt = await tx.wait();
         receipt = receipt.events?.filter((x: any) => {return x.event == "ReactionDeployed"})[0];
         
@@ -84,6 +85,7 @@ describe("Reaction Tokens", function () {
         expect(receipt.args.reactionContractAddr).to.be.properAddress;
         expect(receipt.args.reactionTokenName).to.be.equal(reactionTokenName);
         expect(receipt.args.reactionTokenSymbol).to.be.equal(reactionTokenSymbol);
+        expect(receipt.args.tokenMetadataURI).to.be.equal(tokenMetadataURI);
     });
 
     it("Should Stake & Mint some reaction tokens", async function () {
@@ -99,7 +101,7 @@ describe("Reaction Tokens", function () {
         const reactionTokenName: string = 'Like';
         const reactionTokenSymbol: string = 'LIKE';
         
-        let tx = await reactionFactoryContract.deployReaction(reactionTokenName, reactionTokenSymbol);
+        let tx = await reactionFactoryContract.deployReaction(reactionTokenName, reactionTokenSymbol, tokenMetadataURI);
         let receipt = await tx.wait();
         receipt = receipt.events?.filter((x: any) => {return x.event == "ReactionDeployed"})[0];
 

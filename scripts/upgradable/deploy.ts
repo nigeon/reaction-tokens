@@ -62,5 +62,5 @@ const upgradeReactionFactory = async (contractCurrentDeployedAddress: Address) =
     );
 
 // Deployment
-// deployReactionFactory().then(console.log).catch(console.error);
+deployReactionFactory().then(console.log).catch(console.error);
 // upgradeReactionFactory().then(console.log).catch(console.error);
