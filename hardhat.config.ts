@@ -42,7 +42,7 @@ const config: HardhatUserConfig = {
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : "remote",
     },
     mumbai: {
-      url: `https://polygon-mumbai.infura.io/v3/${process.env.INFURA_PROJECTID}`,
+      url: `https://polygon-mumbai.g.alchemy.com/v2/${process.env.ALCHEMY_APIKEY}`,
       chainId: 80001,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : "remote",
     },
