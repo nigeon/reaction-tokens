@@ -76,7 +76,7 @@ describe("Reaction Tokens", function () {
         // Deploy new Reaction Token
         const reactionTokenName: string = 'Like';
         const reactionTokenSymbol: string = 'LIKE';
-        
+
         let tx = await reactionFactoryContract.deployReaction(reactionTokenName, reactionTokenSymbol, tokenMetadataURI);
         let receipt = await tx.wait();
         receipt = receipt.events?.filter((x: any) => {return x.event == "ReactionDeployed"})[0];
@@ -86,6 +86,28 @@ describe("Reaction Tokens", function () {
         expect(receipt.args.reactionTokenName).to.be.equal(reactionTokenName);
         expect(receipt.args.reactionTokenSymbol).to.be.equal(reactionTokenSymbol);
         expect(receipt.args.tokenMetadataURI).to.be.equal(tokenMetadataURI);
+    });
+    
+    it("Should create & get superTokens on the Reaction Factory", async function () {
+        // Deploy Reaction Factory
+        const contractFactory = await ethers.getContractFactory("ReactionFactory");
+        let reactionFactoryContract: Contract = await contractFactory.deploy();
+        expect(reactionFactoryContract.address).to.be.properAddress;
+
+        // Init Factory
+        await expect(reactionFactoryContract.initialize(sfHost, sfCfa, sfSuperTokenFactory, sfResolver, sfVersion))
+            .to.emit(reactionFactoryContract, "Initialized");
+
+        expect(await reactionFactoryContract.isSuperToken(erc20Contract.address)).to.be.false;
+        expect(await reactionFactoryContract.getSuperToken(erc20Contract.address)).to.be.equal("0x0000000000000000000000000000000000000000");
+
+        // Create the SuperToken
+        const tx = await reactionFactoryContract.createSuperToken(erc20Contract.address);
+        await tx.wait();
+        
+        const superToken = await reactionFactoryContract.getSuperToken(erc20Contract.address);
+        expect(superToken).to.be.properAddress;
+        expect(superToken).to.be.not.equal("0x0000000000000000000000000000000000000000");
     });
 
     it("Should Stake & Mint some reaction tokens", async function () {
@@ -123,6 +145,8 @@ describe("Reaction Tokens", function () {
         expect(receipt.args.stakingTokenAddress).to.be.equal(erc20Contract.address);
         expect(receipt.args.stakingSuperTokenAddress).to.be.properAddress;
 
+        const expectedSuperTokenAddress = receipt.args.stakingSuperTokenAddress;
+
         expect(await reactionTokenContract.balanceOf(erc721Contract.address)).to.equal(stakingAmount);
         
         const superTokenContract = await ethers.getContractAt("ISuperToken", receipt.args.stakingSuperTokenAddress);
@@ -151,6 +175,8 @@ describe("Reaction Tokens", function () {
         expect(receipt.args.author).to.be.equal(owner.address);
         expect(receipt.args.stakingTokenAddress).to.be.equal(diffErc20Contract.address);
         expect(receipt.args.stakingSuperTokenAddress).to.be.properAddress;
+
+        expect(receipt.args.stakingSuperTokenAddress).to.be.equal(expectedSuperTokenAddress);
 
         expect(await reactionTokenContract.balanceOf(erc721Contract.address)).to.equal(stakingAmount.mul(2));
     });

@@ -24,7 +24,12 @@ const config: HardhatUserConfig = {
     hardhat: {
       forking: { 
         url: `https://eth-goerli.alchemyapi.io/v2/${process.env.ALCHEMY_APIKEY}`
-      }
+      },
+    },
+    meh: {
+      url: `http://127.0.0.1:8545/`,
+      chainId: 31337,
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : "remote",
     },
     mainnet: {
       url: `https://mainnet.infura.io/v3/${process.env.INFURA_PROJECTID}`,

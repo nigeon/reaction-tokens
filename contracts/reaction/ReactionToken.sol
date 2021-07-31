@@ -8,13 +8,13 @@ import "@openzeppelin/contracts/utils/Context.sol";
 import {
     IConstantFlowAgreementV1
 } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/agreements/IConstantFlowAgreementV1.sol";
-import "@superfluid-finance/ethereum-contracts/contracts/interfaces/misc/IResolver.sol";
 import {
     ISuperfluid,
     ISuperToken,
     ISuperTokenFactory
 } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperfluid.sol";
 import { ERC20WithTokenInfo } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/tokens/ERC20WithTokenInfo.sol";
+import "./ReactionFactory.sol";
 
 contract ReactionToken is Context, ERC20 {
     event Staked(address author, uint256 amount, address stakingTokenAddress, address stakingSuperTokenAddress);
@@ -23,31 +23,29 @@ contract ReactionToken is Context, ERC20 {
     ISuperfluid internal _host; // Superfluid host address
     IConstantFlowAgreementV1 internal _cfa; // Superfluid Constant Flow Agreement address
     ISuperTokenFactory internal _superTokenFactory; // Superfluid Supertoken Factory
-    IResolver internal _resolver; // Superfluid resolver
-    string internal _version; // Superfluid version
 
     string internal _tokenMetadataURI; // Metadata url
 
+    ReactionFactory internal _reactionFactory;
+
     constructor(
+        address reactionFactory,
         address host, 
         address cfa, 
         address superTokenFactory, 
-        address resolver,
-        string memory version,
         string memory reactionTokenName, 
         string memory reactionTokenSymbol,
         string memory tokenMetadataURI
     ) ERC20(reactionTokenName, reactionTokenSymbol) {
+        require(address(reactionFactory) != address(0), "ReactionToken: Reaction Factory can't be 0x");
         require(address(host) != address(0), "ReactionToken: Host Address can't be 0x");
         require(address(cfa) != address(0), "ReactionToken: CFA Address can't be 0x");
         require(address(superTokenFactory) != address(0), "ReactionToken: SuperTokenFactory Address can't be 0x");
-        require(address(resolver) != address(0), "ReactionToken: Resolver Address can't be 0x");
 
+        _reactionFactory = ReactionFactory(reactionFactory);
         _host = ISuperfluid(host);
         _cfa =  IConstantFlowAgreementV1(cfa);
         _superTokenFactory = ISuperTokenFactory(superTokenFactory);
-        _resolver = IResolver(resolver);
-        _version = version;
 
         _tokenMetadataURI = tokenMetadataURI;
     }
@@ -65,9 +63,9 @@ contract ReactionToken is Context, ERC20 {
         _mint(nftAddress, amount);
 
         // Get/Create the super token
-        address stakingSuperToken = isSuperToken(stakingToken) ? address(stakingToken) : getSuperToken(stakingToken);
+        address stakingSuperToken = _reactionFactory.isSuperToken(stakingToken) ? address(stakingToken) : _reactionFactory.getSuperToken(stakingToken);
         if (stakingSuperToken == address(0)) {
-            stakingSuperToken = address(createSuperToken(stakingToken));
+            stakingSuperToken = address(_reactionFactory.createSuperToken(stakingToken));
         }
 
         // Approve token to be upgraded
@@ -100,23 +98,6 @@ contract ReactionToken is Context, ERC20 {
 
         ERC20 reactionToken = ERC20(address(this));
         emit Reacted(_msgSender(), nftAddress, address(this), amount, reactionToken.name(), reactionToken.symbol());
-    }
-
-    function isSuperToken(ERC20WithTokenInfo _token) public view returns (bool) {
-        string memory tokenId = string(abi.encodePacked('supertokens', '.', _version, '.', _token.symbol()));
-        return _resolver.get(tokenId) == address(_token);
-    }
-
-    function getSuperToken(ERC20WithTokenInfo _token) public view returns (address tokenAddress) {
-        string memory tokenId = string(abi.encodePacked('supertokens', '.', _version, '.', _token.symbol(), 'x'));
-        tokenAddress = _resolver.get(tokenId);
-    }
-
-    function createSuperToken(ERC20WithTokenInfo _token) public returns (ISuperToken superToken) {
-        ISuperTokenFactory factory = _host.getSuperTokenFactory();
-        string memory name = string(abi.encodePacked('Super ', _token.name()));
-        string memory symbol = string(abi.encodePacked(_token.symbol(), 'x'));
-        superToken = factory.createERC20Wrapper(_token, ISuperTokenFactory.Upgradability.FULL_UPGRADABE, name, symbol);
     }
 
     function getTokenMetadataURI() public view returns (string memory) {
