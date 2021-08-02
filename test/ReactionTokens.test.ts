@@ -102,12 +102,15 @@ describe("Reaction Tokens", function () {
         expect(await reactionFactoryContract.getSuperToken(erc20Contract.address)).to.be.equal("0x0000000000000000000000000000000000000000");
 
         // Create the SuperToken
-        const tx = await reactionFactoryContract.createSuperToken(erc20Contract.address);
+        let tx = await reactionFactoryContract.createSuperToken(erc20Contract.address);
         await tx.wait();
-        
+
         const superToken = await reactionFactoryContract.getSuperToken(erc20Contract.address);
         expect(superToken).to.be.properAddress;
         expect(superToken).to.be.not.equal("0x0000000000000000000000000000000000000000");
+        expect(await reactionFactoryContract.isSuperToken(superToken)).to.be.true;
+        await expect(reactionFactoryContract.createSuperToken(superToken)).to.be.revertedWith("ReactionFactory: Token is already a SuperToken");
+        expect(await reactionFactoryContract.getSuperToken(superToken)).to.be.equal(superToken);
     });
 
     it("Should Stake & Mint some reaction tokens", async function () {
@@ -145,7 +148,7 @@ describe("Reaction Tokens", function () {
         expect(receipt.args.stakingTokenAddress).to.be.equal(erc20Contract.address);
         expect(receipt.args.stakingSuperTokenAddress).to.be.properAddress;
 
-        const expectedSuperTokenAddress = receipt.args.stakingSuperTokenAddress;
+        const firstSuperTokenAddress = receipt.args.stakingSuperTokenAddress;
 
         expect(await reactionTokenContract.balanceOf(erc721Contract.address)).to.equal(stakingAmount);
         
@@ -176,9 +179,62 @@ describe("Reaction Tokens", function () {
         expect(receipt.args.stakingTokenAddress).to.be.equal(diffErc20Contract.address);
         expect(receipt.args.stakingSuperTokenAddress).to.be.properAddress;
 
-        expect(receipt.args.stakingSuperTokenAddress).to.be.equal(expectedSuperTokenAddress);
+        expect(receipt.args.stakingSuperTokenAddress).to.be.not.equal(firstSuperTokenAddress);
 
         expect(await reactionTokenContract.balanceOf(erc721Contract.address)).to.equal(stakingAmount.mul(2));
     });
 
+    it("Should Stake & Mint some reaction tokens using a SuperToken", async function () {
+        // Deploy Reaction Factory
+        const contractFactory = await ethers.getContractFactory("ReactionFactory");
+        const reactionFactoryContract: Contract = await contractFactory.deploy();
+
+        // Init Factory
+        await expect(reactionFactoryContract.initialize(sfHost, sfCfa, sfSuperTokenFactory, sfResolver, sfVersion))
+            .to.emit(reactionFactoryContract, "Initialized");
+
+        // Deploy new Reaction Token
+        const reactionTokenName: string = 'Like';
+        const reactionTokenSymbol: string = 'LIKE';
+        
+        let tx = await reactionFactoryContract.deployReaction(reactionTokenName, reactionTokenSymbol, tokenMetadataURI);
+        let receipt = await tx.wait();
+        receipt = receipt.events?.filter((x: any) => {return x.event == "ReactionDeployed"})[0];
+
+        let reactionTokenContractAddr: Address = receipt.args.reactionContractAddr;
+        expect(reactionTokenContractAddr).to.be.properAddress;
+
+        const reactionTokenContract = await ethers.getContractAt("ReactionToken", reactionTokenContractAddr);
+                
+        // Approve tokens sending
+        const stakingAmount: BigNumber = ethers.utils.parseEther("1000");
+        await expect(erc20Contract.approve(reactionTokenContract.address, stakingAmount))
+            .to.emit(erc20Contract, "Approval");
+
+        // Staking
+        tx = await reactionTokenContract.stakeAndMint(stakingAmount, erc20Contract.address, erc721Contract.address);
+        receipt = await tx.wait();
+        receipt = receipt.events?.filter((x: any) => {return x.event == "Staked"})[0];
+
+        const superTokenContract = await ethers.getContractAt("ISuperToken", receipt.args.stakingSuperTokenAddress);
+
+        await timeTravel(3600*24*30); // ABOUT A MONTH LATER ... 🐙
+
+        // Transfer the supertokens to not have a duplicated CFA
+        const superTokenStakingAmount: BigNumber = (await superTokenContract.balanceOf(owner.address));
+
+        await expect(superTokenContract.transferFrom(owner.address, alice.address, superTokenStakingAmount))
+            .to.emit(superTokenContract, "Transfer");
+
+        // Staking & Mint with the SuperToken
+        await expect(superTokenContract.connect(alice).approve(reactionTokenContract.address, superTokenStakingAmount))
+            .to.emit(superTokenContract, "Approval");
+
+        // Staking
+        tx = await reactionTokenContract.connect(alice).stakeAndMint(superTokenStakingAmount, superTokenContract.address, erc721Contract.address);
+        receipt = await tx.wait();
+        receipt = receipt.events?.filter((x: any) => {return x.event == "Staked"})[0];
+        expect(receipt.args.stakingTokenAddress).to.be.equal(superTokenContract.address);
+        expect(receipt.args.stakingSuperTokenAddress).to.be.equal(superTokenContract.address);
+    });
 });
