@@ -3,12 +3,11 @@ import { Address } from "hardhat-deploy/dist/types";
 
 async function main(contractName: string, initializerArgs: any[]) {
   const [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
-
   console.log("Deploying contracts with the account:", owner.address); 
   const Contract = await ethers.getContractFactory(contractName);
-  const reactionFactoryContract = await Contract.deploy();
-  await reactionFactoryContract.initialize(...initializerArgs);
-  console.log(`${contractName} deployed to:`, reactionFactoryContract.address);
+  const deployed = await Contract.deploy();
+  await deployed.initialize(...initializerArgs);
+  console.log(`${contractName} deployed to:`, deployed.address);
 }
 
 const sfHost: Address = process.env.SUPERFLUID_HOST || '';
