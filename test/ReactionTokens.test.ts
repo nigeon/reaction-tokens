@@ -165,13 +165,18 @@ describe("Reaction Tokens", function () {
         // Staking with no approval
         await expect(reactionTokenContract.stakeAndMint(stakingAmount, erc20Contract.address, erc721Contract.address)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
 
+        await expect(erc20Contract.approve(reactionTokenContract.address, stakingAmount))
+            .to.emit(erc20Contract, "Approval");
+        await expect(reactionTokenContract.stakeAndMint(stakingAmount, erc20Contract.address, erc721Contract.address))
+            .to.emit(reactionTokenContract, "Staked");
+
         // Staking & Mint with a different erc20
         const contractFactory2 = await ethers.getContractFactory("DummyErc20");
         const diffErc20Contract = await contractFactory2.deploy(ethers.utils.parseEther("10000"));
         await expect(diffErc20Contract.approve(reactionTokenContract.address, stakingAmount))
             .to.emit(diffErc20Contract, "Approval");
 
-        // Staking
+        // // Staking
         tx = await reactionTokenContract.stakeAndMint(stakingAmount, diffErc20Contract.address, erc721Contract.address);
         receipt = await tx.wait();
         receipt = receipt.events?.filter((x: any) => {return x.event == "Staked"})[0];
@@ -181,7 +186,7 @@ describe("Reaction Tokens", function () {
 
         expect(receipt.args.stakingSuperTokenAddress).to.be.not.equal(firstSuperTokenAddress);
 
-        expect(await reactionTokenContract.balanceOf(erc721Contract.address)).to.equal(stakingAmount.mul(2));
+        expect(await reactionTokenContract.balanceOf(erc721Contract.address)).to.equal(stakingAmount.mul(3));
     });
 
     it("Should Stake & Mint some reaction tokens using a SuperToken", async function () {
@@ -210,7 +215,6 @@ describe("Reaction Tokens", function () {
         const stakingAmount: BigNumber = ethers.utils.parseEther("1000");
         await expect(erc20Contract.approve(reactionTokenContract.address, stakingAmount))
             .to.emit(erc20Contract, "Approval");
-
         // Staking
         tx = await reactionTokenContract.stakeAndMint(stakingAmount, erc20Contract.address, erc721Contract.address);
         receipt = await tx.wait();
@@ -218,9 +222,9 @@ describe("Reaction Tokens", function () {
 
         const superTokenContract = await ethers.getContractAt("ISuperToken", receipt.args.stakingSuperTokenAddress);
 
-        await timeTravel(3600*24*30); // ABOUT A MONTH LATER ... 🐙
+        await timeTravel(3600*24*14); // ABOUT 2 WEEKS LATER ... 🐙
 
-        // Transfer the supertokens to not have a duplicated CFA
+        // Transfer the supertokens to someone else not have a duplicated CFA
         const superTokenStakingAmount: BigNumber = (await superTokenContract.balanceOf(owner.address));
 
         await expect(superTokenContract.transferFrom(owner.address, alice.address, superTokenStakingAmount))

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.7.6;
 
-import "hardhat/console.sol";
-
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
+
+import "hardhat/console.sol";
 
 import {
     IConstantFlowAgreementV1
@@ -68,33 +68,51 @@ contract ReactionToken is Context, ERC20 {
         address stakingSuperToken = _reactionFactory.isSuperToken(stakingToken) ? address(stakingToken) : _reactionFactory.getSuperToken(stakingToken);
         if (stakingSuperToken == address(0)) {
             stakingSuperToken = address(_reactionFactory.createSuperToken(stakingToken));
-        
-            // Approve token to be upgraded
-            if (stakingToken.allowance(address(this), stakingSuperToken) < amount) {
-                bool success = stakingToken.approve(stakingSuperToken, amount); // max allowance
-                require(success, "ReactionToken: Failed to approve allowance to SuperToken");
-            }
-
-            // Give token Superpowers
-            ISuperToken(stakingSuperToken).upgrade(amount);
         }
 
+        // Approve token to be upgraded
+        if (stakingToken.allowance(address(this), stakingSuperToken) < amount) {
+            bool success = stakingToken.approve(stakingSuperToken, amount); // max allowance
+            require(success, "ReactionToken: Failed to approve allowance to SuperToken");
+        }
+        console.log('Upgrading stakingSuperToken %s amount %s', stakingSuperToken, amount);
+
+        // Give token Superpowers
+        ISuperToken(stakingSuperToken).upgrade(amount);
+        
         // Calculate the flow rate
         uint256 secondsInAMonth = 2592000;
         uint256 flowRate = amount/secondsInAMonth; // return the whole stake in one month
 
-        // Create CFA
-        _host.callAgreement(
-            _cfa,
-            abi.encodeWithSelector(
-                _cfa.createFlow.selector,
-                stakingSuperToken,
-                _msgSender(),
-                flowRate,
-                new bytes(0) // placeholder
-            ),
-            new bytes(0)
-        );
+        // Create/Uodate CFA
+        (,int96 outFlowRate, uint256 deposit,) = _cfa.getFlow(ISuperToken(stakingSuperToken), address(this), _msgSender());
+
+        if(outFlowRate > 0){
+            _host.callAgreement(
+                _cfa,
+                abi.encodeWithSelector(
+                    _cfa.updateFlow.selector,
+                    stakingSuperToken,
+                    _msgSender(),
+                    _cfa.getMaximumFlowRateFromDeposit(ISuperToken(stakingSuperToken), deposit),
+                    new bytes(0) // placeholder
+                ),
+                new bytes(0)
+            );
+        }else{
+            _host.callAgreement(
+                _cfa,
+                abi.encodeWithSelector(
+                    _cfa.createFlow.selector,
+                    stakingSuperToken,
+                    _msgSender(),
+                    flowRate,
+                    new bytes(0) // placeholder
+                ),
+                new bytes(0)
+            );
+        }
+
 
         emit Staked(_msgSender(), amount, stakingTokenAddress, stakingSuperToken);
 
