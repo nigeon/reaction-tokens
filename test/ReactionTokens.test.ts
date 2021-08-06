@@ -159,9 +159,6 @@ describe("Reaction Tokens", function () {
         const expectedInOneHour = stakingAmount.div(secondsInAMonth).mul(3600);
         expect(+(await superTokenContract.balanceOf(owner.address)).toString()).to.be.closeTo(+expectedInOneHour.toString(), +ethers.utils.parseEther("1").toString());
 
-        await timeTravel(3600*24*30-3600); // ABOUT A MONTH LATER ... 🐙
-        expect(+(await superTokenContract.balanceOf(owner.address)).toString()).to.be.closeTo(+stakingAmount.toString(), +ethers.utils.parseEther("1").toString());
-
         // Staking with no approval
         await expect(reactionTokenContract.stakeAndMint(stakingAmount, erc20Contract.address, erc721Contract.address)).to.be.revertedWith("ERC20: transfer amount exceeds allowance");
 
@@ -170,13 +167,16 @@ describe("Reaction Tokens", function () {
         await expect(reactionTokenContract.stakeAndMint(stakingAmount, erc20Contract.address, erc721Contract.address))
             .to.emit(reactionTokenContract, "Staked");
 
+        await timeTravel(3600*24*30-3600); // ABOUT A MONTH LATER ... 🐙
+        expect(+(await superTokenContract.balanceOf(owner.address)).toString()).to.be.closeTo(+stakingAmount.toString(), +ethers.utils.parseEther("1").toString());
+
         // Staking & Mint with a different erc20
         const contractFactory2 = await ethers.getContractFactory("DummyErc20");
         const diffErc20Contract = await contractFactory2.deploy(ethers.utils.parseEther("10000"));
         await expect(diffErc20Contract.approve(reactionTokenContract.address, stakingAmount))
             .to.emit(diffErc20Contract, "Approval");
 
-        // // Staking
+        // Staking
         tx = await reactionTokenContract.stakeAndMint(stakingAmount, diffErc20Contract.address, erc721Contract.address);
         receipt = await tx.wait();
         receipt = receipt.events?.filter((x: any) => {return x.event == "Staked"})[0];

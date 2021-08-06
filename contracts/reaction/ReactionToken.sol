@@ -5,8 +5,6 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 
-import "hardhat/console.sol";
-
 import {
     IConstantFlowAgreementV1
 } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/agreements/IConstantFlowAgreementV1.sol";
@@ -68,17 +66,16 @@ contract ReactionToken is Context, ERC20 {
         address stakingSuperToken = _reactionFactory.isSuperToken(stakingToken) ? address(stakingToken) : _reactionFactory.getSuperToken(stakingToken);
         if (stakingSuperToken == address(0)) {
             stakingSuperToken = address(_reactionFactory.createSuperToken(stakingToken));
-        }
 
-        // Approve token to be upgraded
-        if (stakingToken.allowance(address(this), stakingSuperToken) < amount) {
-            bool success = stakingToken.approve(stakingSuperToken, amount); // max allowance
-            require(success, "ReactionToken: Failed to approve allowance to SuperToken");
-        }
-        console.log('Upgrading stakingSuperToken %s amount %s', stakingSuperToken, amount);
+            // Approve token to be upgraded
+            if (stakingToken.allowance(address(this), stakingSuperToken) < amount) {
+                bool success = stakingToken.approve(stakingSuperToken, amount); // max allowance
+                require(success, "ReactionToken: Failed to approve allowance to SuperToken");
+            }
 
-        // Give token Superpowers
-        ISuperToken(stakingSuperToken).upgrade(amount);
+            // Give token Superpowers
+            ISuperToken(stakingSuperToken).upgrade(amount);
+        }
         
         // Calculate the flow rate
         uint256 secondsInAMonth = 2592000;
